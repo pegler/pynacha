@@ -27,6 +27,7 @@ class NachaFile(object):
         
     def add_batch(self, batch):
         batch.batch_number = len(self.batches)+1
+        batch.set_bank_routing_number(self.bank_routing_number)
         self.batches.append(batch)
     
     def render(self):
@@ -41,7 +42,7 @@ class NachaFile(object):
         s += _nacha_render_string('NWFACH', 6)
         s += _nacha_render_string(self.application_id, 8)
         s += _nacha_render_string("'", 1)
-        assert len(s) == 48 
+        assert len(s) == 38
         lines.append(s)
         
         s = ''
@@ -77,9 +78,9 @@ class NachaFile(object):
         s = ''
         s += _nacha_render_string('9', 1)
         s += _nacha_render_string(len(self.batches), 6, '0')
-        s += _nacha_render_string(len(self.lines)+1, 6, '0')
+        s += _nacha_render_string(len(lines)+1, 6, '0')
         s += _nacha_render_string(entry_count, 8, '0')
-        s += _nacha_render_string(str(entry_hash)[:10], 6, '0')
+        s += _nacha_render_string(str(entry_hash)[:10], 10, '0')
         
         debits = total_debit.quantize(Decimal('.01'))*100
         debits = debits.quantize(Decimal('0'))
@@ -121,7 +122,7 @@ class NachaBatch(object):
         self.sec_code = sec_code
         self.description = description
         self.entry_date = entry_date or datetime.date.today()
-        self.company_discrssionary_data = company_discressionary_data
+        self.company_discressionary_data = company_discressionary_data
         
     def set_bank_routing_number(self, bank_routing_number):
         self.bank_routing_number = bank_routing_number
@@ -144,6 +145,7 @@ class NachaBatch(object):
         s += _nacha_render_string(self.company_id, 10, '0')
         s += _nacha_render_string(self.sec_code, 3, '0')
         s += _nacha_render_string(self.description, 10)
+        s += _nacha_render_string('', 6)
         s += _nacha_render_string(self.entry_date.strftime('%y%m%d'), 6)
         s += _nacha_render_string('', 3)
         s += _nacha_render_string('1', 1)
@@ -152,9 +154,9 @@ class NachaBatch(object):
         assert len(s) == 94
         lines.append(s)
         
-        entry_hash = 0
-        total_debit = 0
-        total_credit = 0
+        entry_hash = Decimal(0)
+        total_debit = Decimal(0)
+        total_credit = Decimal(0)
         for entry in self.entries:
             s = entry.render()
             if entry.transaction_code in NachaEntry.CREDIT_OPTIONS:
@@ -233,14 +235,14 @@ class NachaEntry(object):
         s += _nacha_render_string(self.transaction_code, 2)
         s += _nacha_render_string(self.routing_number[:-1], 8, '0')
         s += _nacha_render_string(self.routing_number[-1], 1)
-        s += _nacha_render_string(self.account_number, 10, '0')
+        s += _nacha_render_string(self.account_number, 17, '0')
         
         amt = self.amount.quantize(Decimal('.01'))*100
         amt = amt.quantize(Decimal('0'))
         amt = str(amt)
         
         s += _nacha_render_string(amt, 10, '0')
-        s += _nacha_render_string('', 15)
+        s += _nacha_render_string('', 16)
         s += _nacha_render_string('', 21)
         s += _nacha_render_string('', 2)
         s += _nacha_render_string(0, 1)
@@ -248,3 +250,16 @@ class NachaEntry(object):
         s += _nacha_render_string(self.entry_number, 7, '0')
         assert len(s) == 94
         return s
+    
+    
+if __name__=="__main__":
+    file = NachaFile('WF123', 'TU5678', '5894715', 'WSPQS', 'A', 'WELLS FARGO', 'teamup sports, inc')
+    batch = NachaBatch(NachaBatch.CREDITS_ONLY, 'Pegler Cycling Inc', 'WF123', NachaBatch.CCD, 'Weekly deposit')
+    file.add_batch(batch)
+    
+    entry = NachaEntry(NachaEntry.CHECKING_CREDIT, '12345678', '55148147', Decimal('11.99'))
+    batch.add_entry(entry)
+    
+    
+    
+    print file.render()

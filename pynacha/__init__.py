@@ -14,9 +14,7 @@ def _nacha_render_string(data, max_length, padding=' '):
 class NachaFile(object):
     batches = []
     
-    def __init__(self, remote_id, application_id, bank_routing_number, file_id, file_id_modifier, origination_bank, company_name, creation_datetime=None, reference_code=None):
-        self.remote_id = remote_id
-        self.application_id = application_id
+    def __init__(self, bank_routing_number, file_id, file_id_modifier, origination_bank, company_name, creation_datetime=None, reference_code=''):
         self.bank_routing_number = bank_routing_number
         self.file_id = file_id
         self.file_id_modifier = file_id_modifier
@@ -34,30 +32,18 @@ class NachaFile(object):
         lines = []
         
         s = ''
-        s += _nacha_render_string('$$ADD ID=', 9)
-        s += _nacha_render_string(self.remote_id, 8)
-        s += _nacha_render_string('', 1)
-        s += _nacha_render_string('BID=', 4)
-        s += _nacha_render_string("'", 1)
-        s += _nacha_render_string('NWFACH', 6)
-        s += _nacha_render_string(self.application_id, 8)
-        s += _nacha_render_string("'", 1)
-        assert len(s) == 38
-        lines.append(s)
-        
-        s = ''
         s += _nacha_render_string('1', 1)
         s += _nacha_render_string('01', 2)
-        s += _nacha_render_string(self.bank_routing_number, 10)
+        s += _nacha_render_string(' '+self.bank_routing_number, 10)
         s += _nacha_render_string(self.file_id, 10)
         s += _nacha_render_string(self.creation_datetime.strftime('%y%m%d'), 6)
-        s += _nacha_render_string(self.creation_datetime.strftime('%HM'), 4)
+        s += _nacha_render_string(self.creation_datetime.strftime('%H%M'), 4)
         s += _nacha_render_string(self.file_id_modifier, 1)
         s += _nacha_render_string('094', 3)
         s += _nacha_render_string('10', 2)
         s += _nacha_render_string('1', 1)
-        s += _nacha_render_string(self.origination_bank, 23)
-        s += _nacha_render_string(self.company_name, 23)
+        s += _nacha_render_string(self.origination_bank.upper(), 23)
+        s += _nacha_render_string(self.company_name.upper(), 23)
         s += _nacha_render_string(self.reference_code, 8)
         assert len(s) == 94
         lines.append(s)
@@ -93,7 +79,7 @@ class NachaFile(object):
         credits = str(credits)
         
         s += _nacha_render_string(credits, 12, '0')
-        s += _nacha_render_string('', 39, '0')
+        s += _nacha_render_string('', 39, ' ')
         assert len(s) == 94
         lines.append(s)
         
@@ -115,7 +101,7 @@ class NachaBatch(object):
     bank_routing_number = None
     batch_number = None
     
-    def __init__(self, service_class, company_name, company_id, sec_code, description, entry_date=None, company_discressionary_data=None):
+    def __init__(self, service_class, company_name, company_id, sec_code, description, entry_date=None, company_discressionary_data=''):
         self.service_class = service_class
         self.company_name = company_name
         self.company_id = company_id
@@ -140,16 +126,16 @@ class NachaBatch(object):
         s = ''
         s += _nacha_render_string('5', 1)
         s += _nacha_render_string(self.service_class, 3, '0')
-        s += _nacha_render_string(self.company_name, 16)
+        s += _nacha_render_string(self.company_name.upper(), 16)
         s += _nacha_render_string(self.company_discressionary_data, 20)
         s += _nacha_render_string(self.company_id, 10, '0')
         s += _nacha_render_string(self.sec_code, 3, '0')
-        s += _nacha_render_string(self.description, 10)
+        s += _nacha_render_string(self.description.upper(), 10)
         s += _nacha_render_string('', 6)
         s += _nacha_render_string(self.entry_date.strftime('%y%m%d'), 6)
         s += _nacha_render_string('', 3)
         s += _nacha_render_string('1', 1)
-        s += _nacha_render_string(self.bank_routing_number, 8, '0')
+        s += _nacha_render_string(self.bank_routing_number, 8, ' ')
         s += _nacha_render_string(self.batch_number, 7, '0')
         assert len(s) == 94
         lines.append(s)
@@ -168,7 +154,7 @@ class NachaBatch(object):
             lines.append(s)
             
         s = ''
-        s += _nacha_render_string('5', 1)
+        s += _nacha_render_string('8', 1)
         s += _nacha_render_string(self.service_class, 3, '0')
         s += _nacha_render_string(len(self.entries), 6, '0')
         s += _nacha_render_string(str(entry_hash)[:10], 10, '0')
@@ -216,10 +202,11 @@ class NachaEntry(object):
     
     bank_routing_number = None
     
-    def __init__(self, transaction_code, routing_number, account_number, amount):
+    def __init__(self, transaction_code, routing_number, account_number, amount, individual_name):
         self.transaction_code = str(transaction_code)
         self.routing_number = str(routing_number)
         self.account_number = str(account_number)
+        self.individual_name = individual_name.upper()
         
         if not isinstance(amount, Decimal):
             raise Exception
@@ -235,7 +222,7 @@ class NachaEntry(object):
         s += _nacha_render_string(self.transaction_code, 2)
         s += _nacha_render_string(self.routing_number[:-1], 8, '0')
         s += _nacha_render_string(self.routing_number[-1], 1)
-        s += _nacha_render_string(self.account_number, 17, '0')
+        s += _nacha_render_string(self.account_number, 17, ' ')
         
         amt = self.amount.quantize(Decimal('.01'))*100
         amt = amt.quantize(Decimal('0'))
@@ -243,7 +230,7 @@ class NachaEntry(object):
         
         s += _nacha_render_string(amt, 10, '0')
         s += _nacha_render_string('', 16)
-        s += _nacha_render_string('', 21)
+        s += _nacha_render_string(self.individual_name, 21)
         s += _nacha_render_string('', 2)
         s += _nacha_render_string(0, 1)
         s += _nacha_render_string(self.bank_routing_number, 8, '0')
@@ -253,11 +240,11 @@ class NachaEntry(object):
     
     
 if __name__=="__main__":
-    file = NachaFile('WF123', 'TU5678', '5894715', 'WSPQS', 'A', 'WELLS FARGO', 'teamup sports, inc')
-    batch = NachaBatch(NachaBatch.CREDITS_ONLY, 'Pegler Cycling Inc', 'WF123', NachaBatch.CCD, 'Weekly deposit')
+    file = NachaFile('091000019', '2123456789', 'A', 'WELLS FARGO', 'teamup sports, inc')
+    batch = NachaBatch(NachaBatch.CREDITS_ONLY, 'teamup sports, inc', '2123456789', NachaBatch.CCD, 'Weekly deposit')
     file.add_batch(batch)
     
-    entry = NachaEntry(NachaEntry.CHECKING_CREDIT, '12345678', '55148147', Decimal('11.99'))
+    entry = NachaEntry(NachaEntry.CHECKING_CREDIT, '071923213', '0558769606', Decimal('11.99'), 'Matthew Pegler')
     batch.add_entry(entry)
     
     
